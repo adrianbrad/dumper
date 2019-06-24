@@ -1,8 +1,8 @@
 package dumper
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
@@ -15,6 +15,8 @@ type Dumper struct {
 	lastWriteErr error
 
 	reconTicker int
+
+	mutex sync.Mutex
 }
 
 func New(reconTicker int, pServ, pDumper Service) *Dumper {
@@ -34,25 +36,32 @@ func (d *Dumper) Close() (err error) {
 }
 
 func (d *Dumper) Read(p []byte) (n int, err error) {
-	//no-op
-	return 0, fmt.Errorf("this is a no-op")
+	return d.pDumper.Read(p)
 }
 
 func (d *Dumper) attemptOpenService() {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 	ticker := time.NewTicker(time.Duration(d.reconTicker) * time.Millisecond)
 	for {
 		<-ticker.C
+		//log.Info("Attempting reconnection to service")
 		if err := d.pServ.Open(); err != nil {
 			continue
 		}
-		log.Info("Reconnected to service")
+		d.dump.Set(false)
+		//log.Info("Reconnected to service")
 		break
 	}
 
-	var p []byte
-	for _, err := d.pDumper.Read(p); err != nil; {
-		_, _ = d.pServ.Write(p)
+	p := make([]byte, 100)
+	var err error
+	for n, err := d.pDumper.Read(p); err == nil; {
+		p = p[:n]
+		log.Info(string(p))
+		_, _ = d.Write(p)
 	}
+	log.Errorf("Error while reading from dump, err: %s", err.Error())
 }
 
 func (d *Dumper) Write(p []byte) (n int, err error) {
@@ -63,6 +72,7 @@ func (d *Dumper) Write(p []byte) (n int, err error) {
 			if err != nil {
 				log.Error("Error while writing to dumper: %s", err.Error())
 			}
+			log.Info("Successfully wrote to dump")
 		}
 	}()
 
@@ -71,8 +81,9 @@ func (d *Dumper) Write(p []byte) (n int, err error) {
 		d.dump.Set(true)
 		d.pServ.Close()
 		log.Errorf("Error while writing to service: %s", err.Error())
-		log.Info("Service down, attempting reconnection")
 		go d.attemptOpenService()
+		return
 	}
+	log.Info("Successfully wrote to service")
 	return
 }

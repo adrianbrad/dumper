@@ -4,6 +4,7 @@ import (
 	"dumper"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -21,6 +22,7 @@ func New() *PayloadService {
 
 func (s *PayloadService) Open() (err error) {
 	s.open = true
+	log.Info("Successfully opened memory")
 	return nil
 }
 
@@ -39,6 +41,7 @@ func (s *PayloadService) Write(p []byte) (n int, err error) {
 	s.payloads = append(s.payloads, payload)
 	s.mutex.Unlock()
 
+	log.Info("Successfully saved payload to file")
 	n = len(p)
 	return
 }
@@ -67,10 +70,12 @@ func (s *PayloadService) Read(p []byte) (n int, err error) {
 	}
 
 	n = copy(p, payloadBytes)
+	log.Info("Successfully read payload from memory")
 	return
 }
 
 func (s *PayloadService) Close() (err error) {
 	s.open = false
+	log.Info("Successfully closed memory")
 	return
 }

@@ -14,8 +14,8 @@ type Handler struct {
 
 func New(port string, s dumper.Service) (err error) {
 	h := &Handler{s}
-	log.Info("Starting server on port", port)
-	return http.ListenAndServe(port, h)
+	log.Info("Starting server on port: ", port)
+	return http.ListenAndServe(":"+port, h)
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

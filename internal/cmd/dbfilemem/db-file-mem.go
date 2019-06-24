@@ -1,34 +1,41 @@
 package dbfilemem
 
 import (
+	"dumper"
 	"dumper/internal/file"
 	"dumper/internal/http"
-	"dumper/internal/memory"
 	"dumper/internal/psql"
+	log "github.com/sirupsen/logrus"
 	"os"
+	"strconv"
+	"time"
 )
 
 func Run() {
-	mem := memory.New()
 	output := os.Getenv("OUT")
-	f := file.New(output)
 	host, port, user, pass, dbname := os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_NAME")
+	srvport := os.Getenv("PORT")
+	tic := os.Getenv("TIC")
+	i, _ := strconv.Atoi(tic)
+	f := file.New(output)
 	db := psql.New(host, port, user, pass, dbname)
 
-	mem.Open()
 	f.Open()
 	db.Open()
-	//
-	//go func() {
-	//	for {
-	//		t := time.NewTicker(1 * time.Second)
-	//		<-t.C
-	//		db.Close()
-	//	}
-	//}()
-	//fileMemDumper := dumper.New(2000, f, mem)
-	//
-	//dbFileDumper := dumper.New(2000, db, fileMemDumper)
 
-	http.New(":8080", f)
+	go func() {
+		stopDB := time.NewTicker(1 * time.Second)
+
+		//for {
+		select {
+		case <-stopDB.C:
+			log.Info("stopping db")
+			db.Close()
+
+		}
+		//}
+	}()
+	dbFileDumper := dumper.New(i, db, f)
+
+	log.Error(http.New(srvport, dbFileDumper))
 }

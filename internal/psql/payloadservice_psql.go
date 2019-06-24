@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -33,12 +34,15 @@ func New(host, port, user, pass, name string) *PayloadService {
 func (s *PayloadService) Open() (err error) {
 	s.db, err = sql.Open("postgres", s.connectionInfo)
 	if err != nil {
+		log.Errorf("Error while connecting to db, err :%s", err.Error())
 		return
 	}
 
 	if err = s.db.Ping(); err != nil {
+		log.Errorf("Error while pinging db, err: %s", err.Error())
 		return
 	}
+	log.Info("Successfully connected to db")
 	return
 }
 
@@ -57,6 +61,7 @@ func (s *PayloadService) Write(p []byte) (n int, err error) {
 	INSERT INTO payloads(driver_id, longitude, latitude) 
 	VALUES($1, $2, $3)`,
 		payload.DriverID, payload.Longitude, payload.Latitude); err != nil {
+		log.Errorf("Error while persisting payload to db, err: %s", err.Error())
 		return
 	}
 
@@ -78,6 +83,7 @@ func (s *PayloadService) Read(p []byte) (n int, err error) {
 		&payload.Longitude,
 		&payload.Latitude,
 	); err != nil {
+		log.Errorf("Error while querying payload from db, err: %s", err.Error())
 		return
 	}
 	if _, err = s.db.Exec(`
@@ -89,6 +95,7 @@ func (s *PayloadService) Read(p []byte) (n int, err error) {
 		LIMIT 1
 	)
 	`); err != nil {
+		log.Errorf("Error while deleting payload from db, err: %s", err.Error())
 		return
 	}
 	s.mutex.Unlock()
