@@ -66,7 +66,9 @@ func (s *PayloadService) Read(p []byte) (n int, err error) {
 	}
 
 	payload := lines[linesLen-2]
-	output := strings.Join(lines[:linesLen-2], "\n")
+	outputLines := lines[:linesLen-2]
+	outputLines = append(outputLines, "")
+	output := strings.Join(outputLines, "\n")
 	err = ioutil.WriteFile(s.path, []byte(output), 0644)
 	if err != nil {
 		log.Errorf("Error while writing to file, err: %s", err.Error())

@@ -32,6 +32,9 @@ func New(host, port, user, pass, name string) *PayloadService {
 }
 
 func (s *PayloadService) Open() (err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	s.db, err = sql.Open("postgres", s.connectionInfo)
 	if err != nil {
 		log.Errorf("Error while connecting to db, err :%s", err.Error())
@@ -66,6 +69,7 @@ func (s *PayloadService) Write(p []byte) (n int, err error) {
 	}
 
 	n = len(p)
+	log.Info("Successfully wrote to db")
 	return
 }
 

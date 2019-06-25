@@ -10,7 +10,8 @@ type Dumper struct {
 	pServ   Service
 	pDumper Service
 
-	dump atomicFlag
+	dump            atomicFlag
+	attemptingRecon atomicFlag
 
 	lastWriteErr error
 
@@ -36,27 +37,37 @@ func (d *Dumper) Close() (err error) {
 }
 
 func (d *Dumper) Read(p []byte) (n int, err error) {
-	return d.pDumper.Read(p)
+	if d.dump.Get() {
+		return d.pDumper.Read(p)
+	}
+	return d.pServ.Read(p)
 }
 
 func (d *Dumper) attemptOpenService() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
+
 	ticker := time.NewTicker(time.Duration(d.reconTicker) * time.Millisecond)
 	for {
 		<-ticker.C
-		//log.Info("Attempting reconnection to service")
+		log.Info("Attempting reconnection to service")
 		if err := d.pServ.Open(); err != nil {
 			continue
 		}
 		d.dump.Set(false)
-		//log.Info("Reconnected to service")
+		log.Info("Reconnected to service")
 		break
 	}
 
 	p := make([]byte, 100)
 	var err error
-	for n, err := d.pDumper.Read(p); err == nil; {
+	var n int
+	for {
+		n, err = d.pDumper.Read(p)
+		if err != nil {
+			break
+		}
+
 		p = p[:n]
 		log.Info(string(p))
 		_, _ = d.Write(p)
@@ -81,7 +92,11 @@ func (d *Dumper) Write(p []byte) (n int, err error) {
 		d.dump.Set(true)
 		d.pServ.Close()
 		log.Errorf("Error while writing to service: %s", err.Error())
-		go d.attemptOpenService()
+
+		if !d.attemptingRecon.Get() {
+			go d.attemptOpenService()
+			d.attemptingRecon.Set(true)
+		}
 		return
 	}
 	log.Info("Successfully wrote to service")

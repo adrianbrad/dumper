@@ -41,7 +41,7 @@ func (s *PayloadService) Write(p []byte) (n int, err error) {
 	s.payloads = append(s.payloads, payload)
 	s.mutex.Unlock()
 
-	log.Info("Successfully saved payload to file")
+	log.Info("Successfully saved payload to memory")
 	n = len(p)
 	return
 }
@@ -53,6 +53,7 @@ func (s *PayloadService) Read(p []byte) (n int, err error) {
 	}
 
 	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	pLen := len(s.payloads)
 	if pLen == 0 {
 		err = fmt.Errorf("no elements in memory")
@@ -62,7 +63,6 @@ func (s *PayloadService) Read(p []byte) (n int, err error) {
 
 	// pop payload
 	payload, s.payloads = s.payloads[pLen-1], s.payloads[:pLen-1]
-	s.mutex.Unlock()
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
